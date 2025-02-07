@@ -7,7 +7,6 @@ import os
 df = pd.read_csv("data/retail_sales_dataset.csv")
 df.columns = df.columns.str.lower().str.replace(' ', '_')
 df['date'] = pd.to_datetime(df['date'])
-df.drop(columns=['customer_id'], inplace=True)  # Removing non-essential data
 pd.set_option('display.max_columns', None)  # Show all columns when printing
 
 # Save cleaned version
