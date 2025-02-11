@@ -25,16 +25,13 @@ LIMIT 5;
 df_top_sellers = pd.read_sql(query, conn)
 print("\nTop 5 Selling Products:\n", df_top_sellers)
 
-### 3️⃣ Repeat Customers vs. One-Time Buyers
+### 3️⃣ Total Transactions in Database
 query = """
-SELECT 
-    COUNT(DISTINCT customer_id) AS total_customers,
-    COUNT(customer_id) AS total_transactions,
-    COUNT(customer_id) - COUNT(DISTINCT customer_id) AS repeat_customers
-FROM sales_data;
+SELECT COUNT(*) AS total_transactions FROM sales_data;
 """
-df_customer_behavior = pd.read_sql(query, conn)
-print("\nCustomer Buying Behavior:\n", df_customer_behavior)
+df_total_transactions = pd.read_sql(query, conn)
+print("\nTotal Transactions in Database:\n", df_total_transactions)
+
 
 ### 4️⃣ Sales Trends by Day of the Week
 query = """
@@ -55,6 +52,7 @@ ORDER BY total_revenue DESC;
 """
 df_revenue_impact = pd.read_sql(query, conn)
 print("\nHighest Revenue Impact Products:\n", df_revenue_impact)
+
 
 # Close connection
 conn.close()
