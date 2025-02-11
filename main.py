@@ -6,7 +6,18 @@ import os
 # Load and clean data
 df = pd.read_csv("data/retail_sales_dataset.csv")
 df.columns = df.columns.str.lower().str.replace(' ', '_')
+
+# Check if new sales data exists and append it
+try:
+    new_df = pd.read_csv("data/new_sales.csv")
+    df = pd.concat([df, new_df], ignore_index=True)
+    print("✅ New sales data added!")
+except FileNotFoundError:
+    print("⚠ No new sales data found. Running with existing dataset.")
+
 df['date'] = pd.to_datetime(df['date'])
+if 'customer_id' in df.columns:
+    df.drop(columns=['customer_id'], inplace=True)
 pd.set_option('display.max_columns', None)  # Show all columns when printing
 
 # Save cleaned version
@@ -15,8 +26,14 @@ df.to_csv("data/cleaned_retail_sales.csv", index=False)
 # Connect to SQLite database
 conn = sqlite3.connect("database/sales.db")
 
-# Save DataFrame to SQLite
-df.to_sql("sales_data", conn, if_exists="replace", index=False)
+# Load existing data from SQLite
+existing_data = pd.read_sql("SELECT * FROM sales_data", conn)
+
+# Identify new transactions (rows not already in the database)
+new_data = df[~df["transaction_id"].isin(existing_data["transaction_id"])]
+
+# Append only new transactions
+new_data.to_sql("sales_data", conn, if_exists="append", index=False)
 
 ### **QUERIES FOR INSIGHTS**
 # 1️⃣ Show all unique product categories
