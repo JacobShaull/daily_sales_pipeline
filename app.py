@@ -22,6 +22,8 @@ def get_sales_data():
 
 # Generate a bar chart
 def generate_chart():
+    import matplotlib.pyplot as plt  # Import inside the function to prevent issues
+    plt.switch_backend('Agg')  # Force non-GUI backend here
     df = get_sales_data()
     plt.figure(figsize=(6,4))
     plt.bar(df["product_category"], df["total_sales"], color=["blue", "green", "red"])
@@ -38,4 +40,4 @@ def index():
     return render_template("index.html", tables=[df.to_html(classes="data")], titles=df.columns.values)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5001)
