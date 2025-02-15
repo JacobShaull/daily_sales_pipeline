@@ -18,24 +18,40 @@ if not os.path.exists(os.path.dirname(DB_PATH)):
 
 # Ensure database exists
 def ensure_database():
+    """Ensure the database and sales_data table exist, and populate if missing."""
     if not os.path.exists(DB_PATH):
-        conn = sqlite3.connect(DB_PATH)
-        conn.execute("""
-        CREATE TABLE IF NOT EXISTS sales_data (
-            transaction_id INTEGER PRIMARY KEY,
-            date TEXT,
-            gender TEXT,
-            age INTEGER,
-            product_category TEXT,
-            quantity INTEGER,
-            price_per_unit INTEGER,
-            total_amount INTEGER
-        )
-        """)
-        conn.commit()
-        conn.close()
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-ensure_database()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Create table if it doesn't exist
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS sales_data (
+        transaction_id INTEGER PRIMARY KEY,
+        date TEXT,
+        gender TEXT,
+        age INTEGER,
+        product_category TEXT,
+        quantity INTEGER,
+        price_per_unit INTEGER,
+        total_amount INTEGER
+    )
+    """)
+
+    # Check if data exists
+    cursor.execute("SELECT COUNT(*) FROM sales_data")
+    row_count = cursor.fetchone()[0]
+
+    # If empty, load initial data
+    if row_count == 0:
+        print("⚠ Database is empty. Loading initial data...")
+        df = pd.read_csv("data/cleaned_retail_sales.csv")  # Use your cleaned dataset
+        df.to_sql("sales_data", conn, if_exists="replace", index=False)
+        print("✅ Data successfully loaded into SQLite!")
+
+    conn.commit()
+    conn.close()
 
 # Fetch sales data
 def get_sales_data():
@@ -102,6 +118,8 @@ def index():
     generate_gender_chart()  # Generate gender spending chart
     df = get_sales_data()
     return render_template("index.html", tables=[df.to_html(classes="data")], titles=df.columns.values)
+
+ensure_database()  # Make sure database has data before starting the app
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001)
