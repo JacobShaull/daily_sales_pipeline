@@ -90,15 +90,24 @@ def get_age_group_spending():
             WHEN age BETWEEN 30 AND 49 THEN 'Adult (30-49)'
             ELSE 'Senior (50+)'
         END as age_group,
+        gender,
         product_category,
         SUM(total_amount) as total_spent
     FROM sales_data
-    GROUP BY age_group, product_category
-    ORDER BY age_group, total_spent DESC;
+    GROUP BY age_group, gender, product_category
+    ORDER BY 
+        CASE 
+            WHEN age_group = 'Teen (13-19)' THEN 1
+            WHEN age_group = 'Young Adult (20-29)' THEN 2
+            WHEN age_group = 'Adult (30-49)' THEN 3
+            WHEN age_group = 'Senior (50+)' THEN 4
+        END, gender, total_spent DESC;
     """
     df_age_groups = pd.read_sql(query, conn)
-    conn.close()  # Close DB connection
-    return df_age_groups  # ✅ Fixed missing return statement
+    conn.close()
+    return df_age_groups
+
+
 
 # Generate total sales chart
 def generate_chart():
@@ -132,21 +141,58 @@ def generate_gender_chart():
     plt.savefig("static/gender_chart.png")
     plt.close()
 
-# ✅ **Fixed generate_age_chart()**
+# Generate age-based spending chart with improved colors, better spacing, and refined visuals
+# Generate age-based spending chart with improved colors, better spacing, and proper category display
 def generate_age_chart():
     df_age = get_age_group_spending()
-    plt.figure(figsize=(8,6))
+    plt.figure(figsize=(10, 6))
 
-    for category in df_age["product_category"].unique():
-        subset = df_age[df_age["product_category"] == category]
-        plt.bar(subset["age_group"], subset["total_spent"], label=category)
+    age_groups = df_age["age_group"].unique()
+    categories = df_age["product_category"].unique()
+    x = range(len(age_groups))  # X-axis positions
 
+    # Color palette: Same base color for categories but different shades per gender
+    colors = {
+        "Electronics_Male": "#4c72b0",  # Deep Blue
+        "Electronics_Female": "#8faadc",  # Light Blue
+        "Clothing_Male": "#55a868",  # Soft Green
+        "Clothing_Female": "#88c599",  # Light Green
+        "Beauty_Male": "#c44e52",  # Rich Red
+        "Beauty_Female": "#e27b7e"  # Light Red/Pink
+    }
+
+    bar_width = 0.4  # Space between Male and Female bars
+
+    # Loop through categories and plot male & female bars for each
+    for category in categories:
+        male_spending = [df_age.loc[(df_age["age_group"] == age) & (df_age["gender"] == "Male") & (df_age["product_category"] == category), "total_spent"].sum() for age in age_groups]
+        female_spending = [df_age.loc[(df_age["age_group"] == age) & (df_age["gender"] == "Female") & (df_age["product_category"] == category), "total_spent"].sum() for age in age_groups]
+
+        # Ensure that missing categories show as 0 instead of disappearing
+        male_spending = [0 if pd.isna(val) else val for val in male_spending]
+        female_spending = [0 if pd.isna(val) else val for val in female_spending]
+
+        plt.bar([i - bar_width / 2 for i in x], male_spending, width=bar_width, label=f"{category} (Male)", color=colors[f"{category}_Male"], alpha=0.9)
+        plt.bar([i + bar_width / 2 for i in x], female_spending, width=bar_width, label=f"{category} (Female)", color=colors[f"{category}_Female"], edgecolor='black', alpha=0.8)
+
+    # Improved spacing for labels
+    max_height = max(df_age["total_spent"]) if not df_age.empty else 1  # Prevent division by zero
+    gender_labels_y = -max_height * 0.06  # Space for Male/Female labels
+    age_labels_y = -max_height * 0.12  # Space for Age Group labels
+
+    for i, age in enumerate(age_groups):
+        plt.text(i - bar_width / 2, gender_labels_y, "Male", ha="center", fontsize=12, fontweight="bold", color="black")
+        plt.text(i + bar_width / 2, gender_labels_y, "Female", ha="center", fontsize=12, fontweight="bold", color="black")
+        plt.text(i, age_labels_y, age, ha="center", fontsize=12, fontweight="bold", color="black")
+
+    plt.xticks(x, [])  # Hide default x-axis labels since we added them manually
     plt.xlabel("Age Group")
     plt.ylabel("Total Spent ($)")
-    plt.title("Spending by Age Group and Product")
+    plt.title("Spending by Age Group & Product Category")
     plt.legend()
     plt.savefig("static/age_chart.png")
     plt.close()
+
 
 # Flask route to render dashboard
 @app.route("/")
