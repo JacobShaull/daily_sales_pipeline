@@ -79,6 +79,27 @@ def get_gender_spending():
     conn.close()
     return df
 
+# ✅ **Fixed `get_age_group_spending()`**
+def get_age_group_spending():
+    conn = sqlite3.connect(DB_PATH)
+    query = """
+    SELECT 
+        CASE 
+            WHEN age BETWEEN 13 AND 19 THEN 'Teen (13-19)'
+            WHEN age BETWEEN 20 AND 29 THEN 'Young Adult (20-29)'
+            WHEN age BETWEEN 30 AND 49 THEN 'Adult (30-49)'
+            ELSE 'Senior (50+)'
+        END as age_group,
+        product_category,
+        SUM(total_amount) as total_spent
+    FROM sales_data
+    GROUP BY age_group, product_category
+    ORDER BY age_group, total_spent DESC;
+    """
+    df_age_groups = pd.read_sql(query, conn)
+    conn.close()  # Close DB connection
+    return df_age_groups  # ✅ Fixed missing return statement
+
 # Generate total sales chart
 def generate_chart():
     df = get_sales_data()
@@ -111,15 +132,33 @@ def generate_gender_chart():
     plt.savefig("static/gender_chart.png")
     plt.close()
 
+# ✅ **Fixed generate_age_chart()**
+def generate_age_chart():
+    df_age = get_age_group_spending()
+    plt.figure(figsize=(8,6))
+
+    for category in df_age["product_category"].unique():
+        subset = df_age[df_age["product_category"] == category]
+        plt.bar(subset["age_group"], subset["total_spent"], label=category)
+
+    plt.xlabel("Age Group")
+    plt.ylabel("Total Spent ($)")
+    plt.title("Spending by Age Group and Product")
+    plt.legend()
+    plt.savefig("static/age_chart.png")
+    plt.close()
+
 # Flask route to render dashboard
 @app.route("/")
 def index():
     generate_chart()  # Ensure chart is generated before page loads
     generate_gender_chart()  # Generate gender spending chart
+    generate_age_chart()  # ✅ Ensure age chart is generated too
     df = get_sales_data()
     return render_template("index.html", tables=[df.to_html(classes="data")], titles=df.columns.values)
 
-ensure_database()  # Make sure database has data before starting the app
+# Ensure database is ready before starting Flask app
+ensure_database()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001)
