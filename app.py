@@ -35,6 +35,16 @@ def ensure_database():
         )
         """)
         conn.commit()
+
+        # Load sales data from CSV if database is empty
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM sales_data")
+        count = cursor.fetchone()[0]
+        if count == 0:
+            df = pd.read_csv("data/cleaned_retail_sales.csv")
+            df.to_sql("sales_data", conn, if_exists="replace", index=False)
+            print("✅ Sales data loaded into SQLite on Render!")
+
         conn.close()
 
 
@@ -78,4 +88,4 @@ def index():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001)
+    app.run(host="0.0.0.0", port=10000)
