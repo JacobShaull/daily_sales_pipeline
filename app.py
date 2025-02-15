@@ -8,8 +8,6 @@ import os
 
 app = Flask(__name__)
 
-import os
-
 # Get the absolute path for SQLite
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "database", "sales.db")
@@ -18,7 +16,7 @@ DB_PATH = os.path.join(BASE_DIR, "database", "sales.db")
 if not os.path.exists(os.path.dirname(DB_PATH)):
     os.makedirs(os.path.dirname(DB_PATH))
 
-# Function to create the database if missing
+# Ensure database exists
 def ensure_database():
     if not os.path.exists(DB_PATH):
         conn = sqlite3.connect(DB_PATH)
@@ -35,26 +33,13 @@ def ensure_database():
         )
         """)
         conn.commit()
-
-        # Load sales data from CSV if database is empty
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM sales_data")
-        count = cursor.fetchone()[0]
-        if count == 0:
-            df = pd.read_csv("data/cleaned_retail_sales.csv")
-            df.to_sql("sales_data", conn, if_exists="replace", index=False)
-            print("✅ Sales data loaded into SQLite on Render!")
-
         conn.close()
 
-
-# Call the function before using the database
 ensure_database()
 
-
-# Function to fetch data from SQLite
+# Fetch sales data
 def get_sales_data():
-    conn = sqlite3.connect(DB_PATH)  # Use the absolute path
+    conn = sqlite3.connect(DB_PATH)
     query = """
     SELECT product_category, SUM(total_amount) as total_sales
     FROM sales_data
@@ -65,11 +50,21 @@ def get_sales_data():
     conn.close()
     return df
 
+# Fetch gender-based sales data
+def get_gender_spending():
+    conn = sqlite3.connect(DB_PATH)
+    query = """
+    SELECT gender, product_category, SUM(total_amount) as total_spent
+    FROM sales_data
+    GROUP BY gender, product_category
+    ORDER BY gender, total_spent DESC;
+    """
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
 
-# Generate a bar chart
+# Generate total sales chart
 def generate_chart():
-    import matplotlib.pyplot as plt  # Import inside the function to prevent issues
-    plt.switch_backend('Agg')  # Force non-GUI backend here
     df = get_sales_data()
     plt.figure(figsize=(6,4))
     plt.bar(df["product_category"], df["total_sales"], color=["blue", "green", "red"])
@@ -79,13 +74,34 @@ def generate_chart():
     plt.savefig("static/sales_chart.png")
     plt.close()
 
+# Generate gender-based spending chart
+def generate_gender_chart():
+    df_gender = get_gender_spending()
+    plt.figure(figsize=(6,4))
+    categories = df_gender["product_category"].unique()
 
+    female_spending = df_gender[df_gender["gender"] == "Female"]["total_spent"].tolist()
+    male_spending = df_gender[df_gender["gender"] == "Male"]["total_spent"].tolist()
+
+    x = range(len(categories))
+    plt.bar(x, female_spending, width=0.4, label="Female", color="pink", align='center')
+    plt.bar(x, male_spending, width=0.4, label="Male", color="blue", align='edge')
+
+    plt.xticks(x, categories)
+    plt.xlabel("Product Category")
+    plt.ylabel("Total Spent ($)")
+    plt.title("Spending by Gender per Category")
+    plt.legend()
+    plt.savefig("static/gender_chart.png")
+    plt.close()
+
+# Flask route to render dashboard
 @app.route("/")
 def index():
-    generate_chart()  # Generate chart before rendering page
+    generate_chart()  # Ensure chart is generated before page loads
+    generate_gender_chart()  # Generate gender spending chart
     df = get_sales_data()
     return render_template("index.html", tables=[df.to_html(classes="data")], titles=df.columns.values)
 
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=5001)
