@@ -141,8 +141,8 @@ def generate_gender_chart():
     plt.savefig("static/gender_chart.png")
     plt.close()
 
-# Generate age-based spending chart with improved colors, better spacing, and refined visuals
-# Generate age-based spending chart with improved colors, better spacing, and proper category display
+
+# Generate age-based spending chart with gender labels below the bars
 def generate_age_chart():
     df_age = get_age_group_spending()
     plt.figure(figsize=(10, 6))
@@ -151,48 +151,32 @@ def generate_age_chart():
     categories = df_age["product_category"].unique()
     x = range(len(age_groups))  # X-axis positions
 
-    # Color palette: Same base color for categories but different shades per gender
+    # Define consistent colors for product categories
     colors = {
-        "Electronics_Male": "#4c72b0",  # Deep Blue
-        "Electronics_Female": "#8faadc",  # Light Blue
-        "Clothing_Male": "#55a868",  # Soft Green
-        "Clothing_Female": "#88c599",  # Light Green
-        "Beauty_Male": "#c44e52",  # Rich Red
-        "Beauty_Female": "#e27b7e"  # Light Red/Pink
+        "Electronics": "blue",
+        "Clothing": "green",
+        "Beauty": "red"
     }
 
-    bar_width = 0.4  # Space between Male and Female bars
-
-    # Loop through categories and plot male & female bars for each
+    # Plot bars for each product category
     for category in categories:
-        male_spending = [df_age.loc[(df_age["age_group"] == age) & (df_age["gender"] == "Male") & (df_age["product_category"] == category), "total_spent"].sum() for age in age_groups]
-        female_spending = [df_age.loc[(df_age["age_group"] == age) & (df_age["gender"] == "Female") & (df_age["product_category"] == category), "total_spent"].sum() for age in age_groups]
+        subset = df_age[df_age["product_category"] == category]
+        total_spending = [subset[subset["age_group"] == age]["total_spent"].sum() for age in age_groups]
+        plt.bar(x, total_spending, label=category, color=colors[category])
 
-        # Ensure that missing categories show as 0 instead of disappearing
-        male_spending = [0 if pd.isna(val) else val for val in male_spending]
-        female_spending = [0 if pd.isna(val) else val for val in female_spending]
-
-        plt.bar([i - bar_width / 2 for i in x], male_spending, width=bar_width, label=f"{category} (Male)", color=colors[f"{category}_Male"], alpha=0.9)
-        plt.bar([i + bar_width / 2 for i in x], female_spending, width=bar_width, label=f"{category} (Female)", color=colors[f"{category}_Female"], edgecolor='black', alpha=0.8)
-
-    # Improved spacing for labels
-    max_height = max(df_age["total_spent"]) if not df_age.empty else 1  # Prevent division by zero
-    gender_labels_y = -max_height * 0.06  # Space for Male/Female labels
-    age_labels_y = -max_height * 0.12  # Space for Age Group labels
-
+    # Add Male & Female labels directly above "Teen", "Young Adult", etc.
+    gender_labels_y = -max(df_age["total_spent"]) * 0.05  # Position labels below the bars
     for i, age in enumerate(age_groups):
-        plt.text(i - bar_width / 2, gender_labels_y, "Male", ha="center", fontsize=12, fontweight="bold", color="black")
-        plt.text(i + bar_width / 2, gender_labels_y, "Female", ha="center", fontsize=12, fontweight="bold", color="black")
-        plt.text(i, age_labels_y, age, ha="center", fontsize=12, fontweight="bold", color="black")
+        plt.text(i, gender_labels_y, "Male", ha="right", fontsize=12, fontweight="bold", color="black")
+        plt.text(i, gender_labels_y, "Female", ha="left", fontsize=12, fontweight="bold", color="black")
 
-    plt.xticks(x, [])  # Hide default x-axis labels since we added them manually
+    plt.xticks(x, age_groups)
     plt.xlabel("Age Group")
     plt.ylabel("Total Spent ($)")
     plt.title("Spending by Age Group & Product Category")
     plt.legend()
     plt.savefig("static/age_chart.png")
     plt.close()
-
 
 # Flask route to render dashboard
 @app.route("/")
@@ -207,4 +191,5 @@ def index():
 ensure_database()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001)
+    app.run(host="0.0.0.0", port=5001, debug=False)
+
